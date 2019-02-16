@@ -1,1 +1,1 @@
-## RC coin project with Hyperledger Fabric
+## RC coin project with Hyperledger Fabric sdk
