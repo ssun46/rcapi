@@ -59,4 +59,8 @@ module.exports = function (app, io) {
   app.get('/get_block_info/', function (req, res) {
     rc_coin.get_block_info(req, res, fabric);
   });
+  // server restart
+  app.get('/node_restart/', function (req, res) {
+    rc_coin.node_restart(req, res);
+  });
 }

@@ -2,14 +2,14 @@ var Fabric_Client = require('fabric-client');
 var path = require('path');
 var util = require('util');
 var os = require('os');
-var evt_glob = null;
-var socket_glob = null;
-var io = require('socket.io-client')
+var io = require('socket.io-client');
+var exec = require("child_process").exec;
 
 var socket_conn = function (blocks) {
 	// socket////////////////////////////////////////////////////////
 	console.log("in the socket block #####################################")
 	console.log(blocks);
+	var host = '127.0.0.1';
 	var socket = io.connect('127.0.0.1:4000');
 	socket['io']['opts'] = {
 		'hostname': "127.0.0.1",
@@ -30,7 +30,7 @@ var socket_conn = function (blocks) {
 }
 
 var block_listener = function (channel, event_hub) {
-	console.log("block listener ####################################################")
+	console.log("block listener ####################################################");
 	let blockPromise = new Promise((resolve, reject) => {
 		let handle = setTimeout(() => {
 			event_hub.unregisterBlockEvent(1);
@@ -38,7 +38,7 @@ var block_listener = function (channel, event_hub) {
 			resolve({ event_status: 'TIMEOUT' }); //we could use reject(new Error('Trnasaction did not complete within 30 seconds'));
 		}, 3000);
 		event_hub.registerBlockEvent((block) => {
-			console.log("in the block event ############################################")
+			console.log("in the block event ############################################");
 			// this is the callback for transaction event status
 			// first some clean up of event listener
 			clearTimeout(handle);
@@ -69,7 +69,7 @@ var block_listener = function (channel, event_hub) {
 }
 
 var tx_listener = function (channel, peer, event_hub, tx_id) {
-	console.log("tx listener ####################################################")
+	console.log("tx listener ####################################################");
 	let txPromise = new Promise((resolve, reject) => {
 		let handle = setTimeout(() => {
 			event_hub.unregisterTxEvent(tx_id);
@@ -365,13 +365,32 @@ module.exports = (function () {
 					res.json(result_of_tx);
 				}
 			}).then((results) => {
+				var blockPromise = [];
+				if (results) {
+					for (var i = 0; i < evt.length; i++) {
+						console.log("blockpromise #######################################")
+						blockPromise[i] = block_listener(channel, evt[i]);
+						blockPromise[i].then((result) => {
+							console.log(result)
+							block_evt_list.push(result);
+						});
+					}
+				}
+				return Promise.all(blockPromise);
+			}).then((results) => {
+				// socket emit
+				console.log("block then results #############################")
+				console.log(block_evt_list.length)
+				socket_conn(block_evt_list);
 				console.log('Send transaction promise and event listener promise have completed');
 				result_of_tx['result'] = 'success'
+				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
 				console.error('Failed to invoke :: ' + err);
 				result_of_tx['result'] = 'fail'
-				res.json(result_of_tx);
+				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
+				res.send(result_of_tx);
 			});
 
 		},
@@ -497,14 +516,32 @@ module.exports = (function () {
 					res.json(result_of_tx);
 				}
 			}).then((results) => {
+				var blockPromise = [];
+				if (results) {
+					for (var i = 0; i < evt.length; i++) {
+						console.log("blockpromise #######################################")
+						blockPromise[i] = block_listener(channel, evt[i]);
+						blockPromise[i].then((result) => {
+							console.log(result)
+							block_evt_list.push(result);
+						});
+					}
+				}
+				return Promise.all(blockPromise);
+			}).then((results) => {
+				// socket emit
+				console.log("block then results #############################")
+				console.log(block_evt_list.length)
+				socket_conn(block_evt_list);
 				console.log('Send transaction promise and event listener promise have completed');
 				result_of_tx['result'] = 'success'
-				result_of_tx['tx_id'] = tx_id;
+				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
 				console.error('Failed to invoke :: ' + err);
 				result_of_tx['result'] = 'fail'
-				res.json(result_of_tx);
+				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
+				res.send(result_of_tx);
 			});
 
 		},
@@ -908,6 +945,42 @@ module.exports = (function () {
 				result_of_tx['message'] = err;
 				result_of_tx['result'] = 'fail'
 				res.json(result_of_tx)
+			});
+		},
+		node_restart: function (req, res) {
+			console.log("node restart ###################################################");
+			///////////////////////////////////////////////
+			// const data = JSON.parse(req.query.param_data);
+			///////////////////////////////////////////////
+			var data = req.query;
+			console.log(data.peer);
+			console.log(data.chaincode);
+
+			var peer = data.peer;
+			var chaincode = data.chaincode; 
+			var cmd = "docker start " + peer + " " + chaincode;
+
+			exec(cmd, function(err, stdout, stderr){
+				console.log("err");
+				console.log(err);
+				console.log("stdout");
+				console.log(stdout);
+				console.log("stderr");
+				console.log(stderr);
+				if( !err ){
+					var cmd_child = "docker ps -a";
+					exec(cmd_child, function(err, stdout, stderr){
+						res.send(stdout);
+					});
+				}
+			});
+		},
+		node_stop: function (req, res) {
+			exec("ls", function(err, stdout, stderr){
+				console.log(err);
+				console.log(stdout);
+				console.log(stderr);
+				res.send(stdout);
 			});
 		}
 	}
