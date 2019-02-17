@@ -174,7 +174,7 @@ module.exports = (function () {
 				console.log("after proposal ##########################################")
 				var proposalResponses = results[0];
 				var proposal = results[1];
-				console.log(proposalResponses)
+				console.log(proposal)
 				let isProposalGood = false;
 				if (proposalResponses && proposalResponses[0].response &&
 					proposalResponses[0].response.status === 200) {
@@ -242,6 +242,7 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
+				socket_conn(block_evt_list);
 				console.error('Failed to invoke :: ' + err);
 				result_of_tx['result'] = 'fail'
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
@@ -270,6 +271,7 @@ module.exports = (function () {
 			console.log('Store path:' + store_path);
 			var tx_id = null;
 			var result_of_tx = {};
+			let block_evt_list = [];
 			result_of_tx['userId'] = param_userId;
 			result_of_tx['fromId'] = param_fromId;
 			result_of_tx['amount'] = param_amount;
@@ -417,6 +419,7 @@ module.exports = (function () {
 			console.log('Store path:' + store_path);
 			var tx_id = null;
 			var result_of_tx = {};
+			let block_evt_list = [];
 			result_of_tx['fromId'] = param_fromId;
 			result_of_tx['toId'] = param_toId;
 			result_of_tx['amount'] = param_amount;

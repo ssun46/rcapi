@@ -73,12 +73,14 @@ cron.schedule('* * * * * *', () => {
     }
 
     tcpp.probe('localhost', 7051, function (err, avail) {
-        var message = {
-            "status" : avail,
-            "peer" : peer_cfg1.port
-        }
-        socket_conn(message);
-        // console.log(avail);
+        // if( !avail ){
+            var message = {
+                "status" : avail,
+                "peer" : peer_cfg1.port
+            }
+            socket_conn(message);
+            // console.log(avail);
+        // }
     });
     tcpp.ping(peer_cfg1, function (err, data) {
         // console.log(data);
@@ -90,12 +92,15 @@ cron.schedule('* * * * * *', () => {
     }
 
     tcpp.probe('localhost', 8051, function (err, avail) {
-        var message = {
-            "status" : avail,
-            "peer" : peer_cfg2.port
-        }
-        socket_conn(message);
-        // console.log(avail);
+        // if( !avail ){
+            var message = {
+                "status" : avail,
+                "peer" : peer_cfg2.port
+            }
+            socket_conn(message);
+            // console.log(avail);
+        // }
+        
     });
     tcpp.ping(peer_cfg2, function (err, data) {
         // console.log(data);
