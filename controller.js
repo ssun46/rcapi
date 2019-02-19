@@ -5,6 +5,8 @@ var os = require('os');
 var io = require('socket.io-client');
 var exec = require("child_process").exec;
 
+var last_block = 0;
+
 var socket_conn = function (blocks) {
 	// socket////////////////////////////////////////////////////////
 	console.log("in the socket block #####################################")
@@ -46,6 +48,7 @@ var block_listener = function (channel, event_hub) {
 			var code = block['filtered_transactions'][0]['tx_validation_code'];
 			var tx_id = block['filtered_transactions'][0]['txid'];
 			var block_number = block['number'];
+			last_block = block_number;
 			var peer_name = event_hub['_peer']['_name'];
 			// now let the application know what happened
 			var return_status = { peer_name: peer_name, tx_id: tx_id, num: block_number };
@@ -243,7 +246,36 @@ module.exports = (function () {
 				res.json(result_of_tx)
 			}).catch((err) => {
 				socket_conn(block_evt_list);
-				console.error('Failed to invoke :: ' + err);
+				var regex = "/ChannelEventHub has been shutdown/g";
+				var err_string = err.toString();
+				if (err_string.search(regex)) {
+					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
+					var success_evt_peers_name = block_evt_list[0]['peer_name'];
+					// console.log(success_evt_peers_block)
+					// console.log(success_evt_peers_name)
+					// console.log(evt)
+					var block_evt_list_last = [];
+					for (var i = 0; i < evt.length; i++) {
+						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
+							var failed_evt_peers_name = evt[i]['_peer']['_name'];
+							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
+
+								block_evt_list_last.push({
+									peer_name: failed_evt_peers_name,
+									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+									num: result['header']['number']
+								})
+								socket_conn(block_evt_list_last);
+								console.log(failed_evt_peers_name)
+								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
+
+							});
+						}
+					}
+					console.log("true#################");
+				} else {
+					console.error('Failed to invoke :: ' + err);
+				}
 				result_of_tx['result'] = 'fail'
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
 				res.send(result_of_tx);
@@ -318,11 +350,10 @@ module.exports = (function () {
 				// send the transaction proposal to the peers
 				return channel.sendTransactionProposal(request);
 			}).then((results) => {
-				console.log("#################################")
-				console.log(results[0])
-				console.log("#################################")
+				console.log("after proposal ##########################################")
 				var proposalResponses = results[0];
 				var proposal = results[1];
+				console.log(proposal)
 				let isProposalGood = false;
 				if (proposalResponses && proposalResponses[0].response &&
 					proposalResponses[0].response.status === 200) {
@@ -350,21 +381,22 @@ module.exports = (function () {
 					var promises = [];
 
 					var sendPromise = channel.sendTransaction(request);
-
 					promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
 
+					// get an eventhub once the fabric client has a user assigned. The user
+					// is required bacause the event registration must be signed
+
+					// event listeners
 					let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
-					let blockPromise = block_listener(channel, evt[0]);
 
 					promises.push(txPromise);
-					promises.push(blockPromise);
 
 					return Promise.all(promises);
 				} else {
-					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-					// result_of_tx = proposalResponses[0].response.message
 					result_of_tx['result'] = 'fail'
 					res.json(result_of_tx);
+					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
+					throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
 				}
 			}).then((results) => {
 				var blockPromise = [];
@@ -389,7 +421,37 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
-				console.error('Failed to invoke :: ' + err);
+				socket_conn(block_evt_list);
+				var regex = "/ChannelEventHub has been shutdown/g";
+				var err_string = err.toString();
+				if (err_string.search(regex)) {
+					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
+					var success_evt_peers_name = block_evt_list[0]['peer_name'];
+					// console.log(success_evt_peers_block)
+					// console.log(success_evt_peers_name)
+					// console.log(evt)
+					var block_evt_list_last = [];
+					for (var i = 0; i < evt.length; i++) {
+						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
+							var failed_evt_peers_name = evt[i]['_peer']['_name'];
+							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
+
+								block_evt_list_last.push({
+									peer_name: failed_evt_peers_name,
+									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+									num: result['header']['number']
+								})
+								socket_conn(block_evt_list_last);
+								console.log(failed_evt_peers_name)
+								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
+
+							});
+						}
+					}
+					console.log("true#################");
+				} else {
+					console.error('Failed to invoke :: ' + err);
+				}
 				result_of_tx['result'] = 'fail'
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
 				res.send(result_of_tx);
@@ -470,12 +532,10 @@ module.exports = (function () {
 				// send the transaction proposal to the peers
 				return channel.sendTransactionProposal(request);
 			}).then((results) => {
-				console.log("################################")
-				console.log("proposal response##############")
-				result_of_tx['message'] = results[0][0].toString().replace('Error: ', '');
+				console.log("after proposal ##########################################")
 				var proposalResponses = results[0];
 				var proposal = results[1];
-
+				console.log(proposal)
 				let isProposalGood = false;
 				if (proposalResponses && proposalResponses[0].response &&
 					proposalResponses[0].response.status === 200) {
@@ -483,6 +543,7 @@ module.exports = (function () {
 					console.log('Transaction proposal was good');
 				} else {
 					console.error('Transaction proposal was bad');
+					result_of_tx['message'] = proposalResponses[0].response;
 				}
 				if (isProposalGood) {
 					console.log(util.format(
@@ -502,21 +563,22 @@ module.exports = (function () {
 					var promises = [];
 
 					var sendPromise = channel.sendTransaction(request);
-
 					promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
 
+					// get an eventhub once the fabric client has a user assigned. The user
+					// is required bacause the event registration must be signed
+
+					// event listeners
 					let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
-					let blockPromise = block_listener(channel, evt[0]);
 
 					promises.push(txPromise);
-					promises.push(blockPromise);
 
 					return Promise.all(promises);
 				} else {
-					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-					// result_of_tx = proposalResponses[0].response.message
 					result_of_tx['result'] = 'fail'
 					res.json(result_of_tx);
+					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
+					throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
 				}
 			}).then((results) => {
 				var blockPromise = [];
@@ -541,7 +603,37 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
-				console.error('Failed to invoke :: ' + err);
+				socket_conn(block_evt_list);
+				var regex = "/ChannelEventHub has been shutdown/g";
+				var err_string = err.toString();
+				if (err_string.search(regex)) {
+					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
+					var success_evt_peers_name = block_evt_list[0]['peer_name'];
+					// console.log(success_evt_peers_block)
+					// console.log(success_evt_peers_name)
+					// console.log(evt)
+					var block_evt_list_last = [];
+					for (var i = 0; i < evt.length; i++) {
+						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
+							var failed_evt_peers_name = evt[i]['_peer']['_name'];
+							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
+
+								block_evt_list_last.push({
+									peer_name: failed_evt_peers_name,
+									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+									num: result['header']['number']
+								})
+								socket_conn(block_evt_list_last);
+								console.log(failed_evt_peers_name)
+								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
+
+							});
+						}
+					}
+					console.log("true#################");
+				} else {
+					console.error('Failed to invoke :: ' + err);
+				}
 				result_of_tx['result'] = 'fail'
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
 				res.send(result_of_tx);
@@ -875,6 +967,69 @@ module.exports = (function () {
 				res.json(result_of_tx)
 			});
 		},
+		get_default_block: function (req, res, fabric_client) {
+
+			const peer_list = [
+				"localhost:7051",
+				"localhost:8051"
+			]
+			const channel = fabric_client.get_channel();
+
+			var store_path = path.join(os.homedir(), '.hfc-key-store');
+			console.log('Store path:' + store_path);
+			var result_list = [];
+
+			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
+			Fabric_Client.newDefaultKeyValueStore({
+				path: store_path
+			}).then((state_store) => {
+				// assign the store to the fabric client
+				fabric_client.fabric_client.setStateStore(state_store);
+				var crypto_suite = Fabric_Client.newCryptoSuite();
+				// use the same location for the state store (where the users' certificate are kept)
+				// and the crypto store (where the users' keys are kept)
+				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
+				crypto_suite.setCryptoKeyStore(crypto_store);
+				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
+
+				// get the enrolled user from persistence, this user will sign all requests
+				return fabric_client.fabric_client.getUserContext('admin', true);
+			}).then((user_from_store) => {
+				if (user_from_store && user_from_store.isEnrolled()) {
+					console.log('Successfully loaded admin from persistence');
+					member_user = user_from_store;
+				} else {
+					throw new Error('Failed to get user1.... run registerAdmin.js');
+				}
+				var block_num = parseInt(last_block);
+				var block_list = [];
+				for (var i = 0; i < peer_list.length; i++) {
+					block_list[i] = channel.queryBlock(block_num, peer_list[i]).then((result) => {
+						return result;
+					});
+				}
+				return Promise.all(block_list);
+			}).then((result) => {
+				for (var i = 0; i < result.length; i++) {
+					result_list.push({
+						peer_name: peer_list[i],
+						tx_id: result[i]['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+						num: result[i]['header']['number'],
+						ip: peer_list[i].substr(0, peer_list[i].indexOf(":")),
+						port: peer_list[i].substr(peer_list[i].indexOf(":")+1),
+						index: i+1
+					})
+				}
+				res.json(result_list);
+			}).catch((err) => {
+				console.error('Failed to query successfully :: ' + err);
+				result_list.push({
+					message: err,
+					result: "fail"
+				})
+				res.json(result_list);
+			});
+		},
 		get_block_info: function (req, res, fabric_client) {
 			console.log("get_block_info ###################################################");
 			///////////////////////////////////////////////
@@ -926,13 +1081,13 @@ module.exports = (function () {
 					} else {
 						let json_string = query_responses;
 						let result_map = {
-							'timestamp' : json_string['data']['data'][0]['payload']['header']['channel_header']['timestamp'],
+							'timestamp': json_string['data']['data'][0]['payload']['header']['channel_header']['timestamp'],
 							'number': json_string['header']['number'],
 							'previous_hash': json_string['header']['previous_hash'],
 							'data_hash': json_string['header']['data_hash'],
 							'mspid': json_string['data']['data'][0]['payload']['data']['actions'][0]['header']['creator']['Mspid'],
 						};
-						
+
 						console.log("Response is ", result_map);
 						result_of_tx['result'] = 'success';
 						result_of_tx['value'] = query_responses[0];
@@ -950,41 +1105,112 @@ module.exports = (function () {
 				res.json(result_of_tx)
 			});
 		},
-		node_restart: function (req, res) {
+		node_restart: function (req, res, fabric_client) {
 			console.log("node restart ###################################################");
 			///////////////////////////////////////////////
 			// const data = JSON.parse(req.query.param_data);
 			///////////////////////////////////////////////
-			var data = req.query;
-			console.log(data.peer);
-			console.log(data.chaincode);
+			const channel = fabric_client.get_channel();
+			const peer = fabric_client.get_peer();
+			var store_path = path.join(os.homedir(), '.hfc-key-store');
+			console.log('Store path:' + store_path);
+			var tx_id = null;
+			var result_of_tx = {};
 
-			var peer = data.peer;
-			var chaincode = data.chaincode; 
-			var cmd = "docker start " + peer + " " + chaincode;
+			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
+			Fabric_Client.newDefaultKeyValueStore({
+				path: store_path
+			}).then((state_store) => {
+				console.log("after set key path ##################################")
+				// assign the store to the fabric client
+				fabric_client.fabric_client.setStateStore(state_store);
+				var crypto_suite = Fabric_Client.newCryptoSuite();
+				// use the same location for the state store (where the users' certificate are kept)
+				// and the crypto store (where the users' keys are kept)
+				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
+				crypto_suite.setCryptoKeyStore(crypto_store);
+				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
 
-			exec(cmd, function(err, stdout, stderr){
-				console.log("err");
-				console.log(err);
-				console.log("stdout");
-				console.log(stdout);
-				console.log("stderr");
-				console.log(stderr);
-				if( !err ){
-					var cmd_child = "docker ps -a";
-					exec(cmd_child, function(err, stdout, stderr){
-						res.send(stdout);
-					});
+				// get the enrolled user from persistence, this user will sign all requests
+				return fabric_client.fabric_client.getUserContext('admin', true);
+			}).then((user_from_store) => {
+				console.log("after get user ##################################")
+				if (user_from_store && user_from_store.isEnrolled()) {
+					console.log('Successfully loaded admin from persistence');
+					member_user = user_from_store;
+				} else {
+					throw new Error('Failed to get admin.... run registerAdmin.js');
 				}
-			});
+
+				// get a transaction id object based on the current user assigned to fabric client
+				tx_id = fabric_client.fabric_client.newTransactionID();
+				console.log("Assigning transaction_id: ", tx_id._transaction_id);
+
+				let g_request = {
+					txId: tx_id
+				};
+
+				// get the genesis block from the orderer
+				channel.getGenesisBlock(g_request).then((block) => {
+					genesis_block = block;
+					tx_id = fabric_client.fabric_client.newTransactionID();
+					let j_request = {
+						targets: ['localhost:7051'],
+						block: genesis_block,
+						txId: {
+							// signer_or_userContext: 
+							// {
+							// 	role: {
+							// 		name: "admin", 
+							// 		mspId: "Admin"
+							// 	},
+							// 	OrganizationUnit: ,
+							// 	Identity: 
+							// },
+							admin: true
+						}
+					};
+
+					console.log(JSON.stringify(j_request))
+
+					// send genesis block to the peer
+					return channel.joinChannel(j_request);
+				}).then((results) => {
+					if (results && results.response && results.response.status == 200) {
+						console.log('Joined correctly')
+					} else {
+						console.log('Failed', results)
+					}
+				});
+			}).then((results) => {
+				// socket emit
+				console.log('Send transaction promise and event listener promise have completed');
+				result_of_tx['result'] = 'success'
+				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
+				res.json(result_of_tx)
+			})
+
+			// console.log(data.peer);
+			// console.log(data.chaincode);
+
+			// var peer = data.peer;
+			// var chaincode = data.chaincode; 
+			// var cmd = "docker start " + peer + " " + chaincode;
+
+			// exec(cmd, function(err, stdout, stderr){
+			// 	console.log("err");
+			// 	console.log(err);
+			// 	console.log("stdout");
+			// 	console.log(stdout);
+			// 	console.log("stderr");
+			// 	console.log(stderr);
+			// 	if( !err ){
+			// 		var cmd_child = "docker ps -a";
+			// 		exec(cmd_child, function(err, stdout, stderr){
+			// 			res.send(stdout);
+			// 		});
+			// 	}
+			// });
 		},
-		node_stop: function (req, res) {
-			exec("ls", function(err, stdout, stderr){
-				console.log(err);
-				console.log(stdout);
-				console.log(stderr);
-				res.send(stdout);
-			});
-		}
 	}
 })();

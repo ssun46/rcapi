@@ -55,12 +55,16 @@ module.exports = function (app, io) {
   app.get('/get_total_publish/', function (req, res) {
     rc_coin.get_total_publish(req, res, fabric);
   });
+  // get_default_block
+  app.get('/get_default_block/', function (req, res) {
+    rc_coin.get_default_block(req, res, fabric);
+  });
   // get_each_block_info
   app.get('/get_block_info/', function (req, res) {
     rc_coin.get_block_info(req, res, fabric);
   });
   // server restart
   app.get('/node_restart/', function (req, res) {
-    rc_coin.node_restart(req, res);
+    rc_coin.node_restart(req, res, fabric);
   });
 }
