@@ -67,45 +67,62 @@ var tcpp = require('tcp-ping');
 var cron = require('node-cron');
 
 cron.schedule('* * * * * *', () => {
+    // 111111111111111111111111111111
     var peer_cfg1 = {
-        address: 'localhost',
+        address: '210.107.78.166',
         port: '7051'
     }
-
-    tcpp.probe('localhost', 7051, function (err, avail) {
-        // if( !avail ){
+    tcpp.probe(peer_cfg1.address, peer_cfg1.port, function (err, avail) {
             var message = {
                 "status" : avail,
                 "peer" : peer_cfg1.port
             }
             socket_conn(message);
-            // console.log(avail);
-        // }
     });
     tcpp.ping(peer_cfg1, function (err, data) {
-        // console.log(data);
     });
-
+    // 22222222222222222222222222222222
     var peer_cfg2 = {
-        address: 'localhost',
+        address: '210.107.78.166',
         port: '8051'
     }
-
-    tcpp.probe('localhost', 8051, function (err, avail) {
-        // if( !avail ){
+    tcpp.probe(peer_cfg2.address, peer_cfg2.port, function (err, avail) {
             var message = {
                 "status" : avail,
                 "peer" : peer_cfg2.port
             }
             socket_conn(message);
-            // console.log(avail);
-        // }
-        
     });
     tcpp.ping(peer_cfg2, function (err, data) {
-        // console.log(data);
     });
-
+    // 33333333333333333333333333333333
+    var peer_cfg3 = {
+        address: '210.107.78.167',
+        port: '9051'
+    }
+    tcpp.probe(peer_cfg3.address, peer_cfg3.port, function (err, avail) {
+            var message = {
+                "status" : avail,
+                "peer" : peer_cfg3.port
+            }
+            socket_conn(message);
+    });
+    tcpp.ping(peer_cfg3, function (err, data) {
+    });
+    // 444444444444444444444444444444444
+    var peer_cfg4 = {
+        address: '210.107.78.167',
+        port: '10051'
+    }
+    tcpp.probe(peer_cfg4.address, peer_cfg4.port, function (err, avail) {
+            var message = {
+                "status" : avail,
+                "peer" : peer_cfg4.port
+            }
+            socket_conn(message);
+    });
+    tcpp.ping(peer_cfg4, function (err, data) {
+    });
 });
 
 // Load all of our middleware
