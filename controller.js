@@ -266,7 +266,7 @@ module.exports = (function () {
 						failed_evt_peers_name = peer_list[i];
 						var block_num = parseInt(last_block);
 						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
-
+							console.log("failed_evt_peers_name: " + failed_evt_peers_name)
 							block_evt_list_last.push({
 								peer_name: failed_evt_peers_name,
 								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
