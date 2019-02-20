@@ -282,10 +282,15 @@ module.exports = (function () {
 							// console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
 							
 						}).then((result) => {
+							block_evt_list_last.push({
+								peer_name: peer_list[i],
+								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+								num: result['header']['number']
+							})
 							console.log("###############################")
 							console.log("###############################")
 							console.log("###############################")
-							console.log(result)
+							console.log(block_evt_list_last)
 						});
 						// }
 					}
