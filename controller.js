@@ -256,7 +256,8 @@ module.exports = (function () {
 					for (var i = 0; i < evt.length; i++) {
 						// if (success_evt_peers_name != evt[i]['_peer']['_name']) {
 						var failed_evt_peers_name = evt[i]['_peer']['_name'];
-						var is_block = channel.queryBlock(last_block, failed_evt_peers_name).then((result) => {
+						var block_num = parseInt(last_block);
+						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
 
 							block_evt_list_last.push({
 								peer_name: failed_evt_peers_name,
