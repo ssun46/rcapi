@@ -245,19 +245,25 @@ module.exports = (function () {
 				res.json(result_of_tx)
 			}).catch((err) => {
 				// socket_conn(block_evt_list);
+				const peer_list = [
+					"210.107.78.166:7051",
+					"210.107.78.166:8051",
+					"210.107.78.167:9051",
+					"210.107.78.167:10051"
+				]
 				var regex = "/ChannelEventHub has been shutdown/g";
 				var err_string = err.toString();
 				if (err_string.search(regex)) {
+					var block_evt_list_last = [];
 					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
 					// console.log(success_evt_peers_block)
 					// console.log(success_evt_peers_name)
 					// console.log(evt)
-					var block_evt_list_last = [];
 					var failed_evt_peers_name = "";
-					for (var i = 0; i < evt.length; i++) {
+					for (var i = 0; i < peer_list.length; i++) {
 						// if (success_evt_peers_name != evt[i]['_peer']['_name']) {
-						console.log(evt[i]['_peer']['_name']);
-						failed_evt_peers_name = evt[i]['_peer']['_name'].toString();
+						console.log(peer_list[i]);
+						failed_evt_peers_name = peer_list[i];
 						var block_num = parseInt(last_block);
 						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
 
