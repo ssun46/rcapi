@@ -267,18 +267,22 @@ module.exports = (function () {
 						var block_num = parseInt(last_block);
 						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
 
-							block_evt_list_last.push({
-								peer_name: failed_evt_peers_name,
+							// block_evt_list_last.push({
+							// 	peer_name: failed_evt_peers_name,
+							// 	tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+							// 	num: result['header']['number']
+							// })
+							socket_conn([{
+								peer_name: peer_list[i],
 								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
 								num: result['header']['number']
-							})
-							console.log(failed_evt_peers_name)
-							console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
+							}]);
+							// console.log(failed_evt_peers_name)
+							// console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
 							
 						});
 						// }
 					}
-					socket_conn(block_evt_list_last);
 				} else {
 					console.error('Failed to invoke :: ' + err);
 				}
