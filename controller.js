@@ -440,14 +440,13 @@ module.exports = (function () {
 									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
 									num: result['header']['number']
 								})
-								socket_conn(block_evt_list_last);
 								console.log(failed_evt_peers_name)
 								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
-
+								
 							});
 						}
 					}
-					console.log("true#################");
+					socket_conn(block_evt_list_last);
 				} else {
 					console.error('Failed to invoke :: ' + err);
 				}
