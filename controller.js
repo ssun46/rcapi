@@ -11,16 +11,16 @@ var socket_conn = function (blocks) {
 	// socket////////////////////////////////////////////////////////
 	console.log("in the socket block #####################################")
 	console.log(blocks);
-	var socket = io.connect('222.239.231.245:4000');
+	var socket = io.connect('210.107.78.166:4000');
 	socket['io']['opts'] = {
-		'hostname': "222.239.231.245",
+		'hostname': "210.107.78.166",
 		'path': "/socket.io",
 		'port': "4000",
 		'secure': false
 	}
 	socket['nsp'] = "/";
-	socket['io']['uri'] = "http://222.239.231.245:4000";
-	socket['io']['engine']['hostname'] = '222.239.231.245';
+	socket['io']['uri'] = "http://210.107.78.166:4000";
+	socket['io']['engine']['hostname'] = '210.107.78.166';
 	socket['io']['engine']['port'] = '4000';
 	socket.on('connect', function () {
 		console.log("connect");
