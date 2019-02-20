@@ -268,7 +268,7 @@ module.exports = (function () {
 						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
 							console.log("failed_evt_peers_name: " + failed_evt_peers_name)
 							block_evt_list_last.push({
-								peer_name: failed_evt_peers_name,
+								peer_name: peer_list[i],
 								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
 								num: result['header']['number']
 							})
