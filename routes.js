@@ -7,14 +7,18 @@ let evt_glob = [];
 
 con.init_fabric();
 con.set_channel('channelrc');
-con.set_peer('grpc://localhost:8051');
-con.set_peer('grpc://localhost:7051');
-con.set_orderer('grpc://localhost:7050');
+con.set_peer('grpc://210.107.78.166:8051');
+con.set_peer('grpc://210.107.78.166:7051');
+con.set_peer('grpc://210.107.78.167:9051');
+con.set_peer('grpc://210.107.78.167:10051');
+con.set_orderer('grpc://210.107.78.166:7050');
 con.connect_peer();
 con.connect_orderer();
 var peers = con.get_peer();
 evt_glob.push(con.get_channel().newChannelEventHub(peers[0]));
 evt_glob.push(con.get_channel().newChannelEventHub(peers[1]));
+evt_glob.push(con.get_channel().newChannelEventHub(peers[2]));
+evt_glob.push(con.get_channel().newChannelEventHub(peers[3]));
 fabric = con;
 
 // evt_glob = con.get_channel().newChannelEventHub(con.get_peer());

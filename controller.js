@@ -11,17 +11,16 @@ var socket_conn = function (blocks) {
 	// socket////////////////////////////////////////////////////////
 	console.log("in the socket block #####################################")
 	console.log(blocks);
-	var host = '127.0.0.1';
-	var socket = io.connect('127.0.0.1:4000');
+	var socket = io.connect('222.239.231.245:4000');
 	socket['io']['opts'] = {
-		'hostname': "127.0.0.1",
+		'hostname': "222.239.231.245",
 		'path': "/socket.io",
 		'port': "4000",
 		'secure': false
 	}
 	socket['nsp'] = "/";
-	socket['io']['uri'] = "http://127.0.0.1:4000";
-	socket['io']['engine']['hostname'] = '127.0.0.1';
+	socket['io']['uri'] = "http://222.239.231.245:4000";
+	socket['io']['engine']['hostname'] = '222.239.231.245';
 	socket['io']['engine']['port'] = '4000';
 	socket.on('connect', function () {
 		console.log("connect");
@@ -245,32 +244,31 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
-				socket_conn(block_evt_list);
+				// socket_conn(block_evt_list);
 				var regex = "/ChannelEventHub has been shutdown/g";
 				var err_string = err.toString();
 				if (err_string.search(regex)) {
 					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
-					var success_evt_peers_name = block_evt_list[0]['peer_name'];
 					// console.log(success_evt_peers_block)
 					// console.log(success_evt_peers_name)
 					// console.log(evt)
 					var block_evt_list_last = [];
 					for (var i = 0; i < evt.length; i++) {
-						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
-							var failed_evt_peers_name = evt[i]['_peer']['_name'];
-							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
+						// if (success_evt_peers_name != evt[i]['_peer']['_name']) {
+						var failed_evt_peers_name = evt[i]['_peer']['_name'];
+						var is_block = channel.queryBlock(last_block, failed_evt_peers_name).then((result) => {
 
-								block_evt_list_last.push({
-									peer_name: failed_evt_peers_name,
-									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-									num: result['header']['number']
-								})
-								socket_conn(block_evt_list_last);
-								console.log(failed_evt_peers_name)
-								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
+							block_evt_list_last.push({
+								peer_name: failed_evt_peers_name,
+								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
+								num: result['header']['number']
+							})
+							socket_conn(block_evt_list_last);
+							console.log(failed_evt_peers_name)
+							console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
 
-							});
-						}
+						});
+						// }
 					}
 					console.log("true#################");
 				} else {
@@ -970,8 +968,10 @@ module.exports = (function () {
 		get_default_block: function (req, res, fabric_client) {
 
 			const peer_list = [
-				"localhost:7051",
-				"localhost:8051"
+				"210.107.78.166:7051",
+				"210.107.78.166:8051",
+				"210.107.78.167:9051",
+				"210.107.78.167:10051"
 			]
 			const channel = fabric_client.get_channel();
 
