@@ -286,6 +286,7 @@ module.exports = (function () {
 
 					for( var i=0; i<block_evt_list_last.length; i++ ){
 						block_evt_list_last[i]['peer_name'] = peer_list[i];
+						console.log(peer_list)
 					}
 					socket_conn(block_evt_list_last);
 
