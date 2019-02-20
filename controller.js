@@ -289,7 +289,7 @@ module.exports = (function () {
 							})
 							console.log("###############################")
 							console.log("###############################")
-							console.log(peer_name[i])
+							console.log(peer_list[i])
 							console.log("###############################")
 							// console.log(block_evt_list_last[i])
 						});
