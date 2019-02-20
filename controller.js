@@ -273,7 +273,7 @@ module.exports = (function () {
 							// 	num: result['header']['number']
 							// })
 							socket_conn([{
-								peer_name: peer_list[i],
+								peer_name: failed_evt_peers_name,
 								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
 								num: result['header']['number']
 							}]);
