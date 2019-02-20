@@ -251,64 +251,19 @@ module.exports = (function () {
 					"210.107.78.167:9051",
 					"210.107.78.167:10051"
 				]
+				var block_evt_list_last = [];
 				var regex = "/ChannelEventHub has been shutdown/g";
 				var err_string = err.toString();
+				var block_num = parseInt(last_block);
 				if (err_string.search(regex)) {
-					var block_evt_list_last = [];
-					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
-					// console.log(success_evt_peers_block)
-					// console.log(success_evt_peers_name)
-					// console.log(evt)
-					var failed_evt_peers_name = "";
-					for (var i = 0; i < peer_list.length; i++) {
-						// if (success_evt_peers_name != evt[i]['_peer']['_name']) {
-						console.log("peer_list: " + peer_list[i]);
-						failed_evt_peers_name = peer_list[i];
-						var block_num = parseInt(last_block);
-						var is_block = channel.queryBlock(block_num, failed_evt_peers_name).then((result) => {
-							return result;
-							// console.log("failed_evt_peers_name: " + peer_list[i])
-							// block_evt_list_last.push({
-							// 	peer_name: peer_list[i],
-							// 	tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-							// 	num: result['header']['number']
-							// })
-							// socket_conn([{
-							// 	peer_name: failed_evt_peers_name,
-							// 	tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-							// 	num: result['header']['number']
-							// }]);
-							// console.log(failed_evt_peers_name)
-							// console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
-							
-						}).then((result) => {
-							block_evt_list_last.push({
-								peer_name: peer_list[i],
-								tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-								num: result['header']['number']
-							})
-							console.log("###############################")
-							console.log("###############################")
-							console.log(i)
-							console.log("then1: " + result)
-							console.log("###############################")
-						}).then((result) => {
-							console.log("###############################")
-							console.log("###############################")
-							console.log(i)
-							console.log("then2: " + result)
-							console.log("###############################")
-							
-						});
-						// }
-					}
-
-					for( var i=0; i<block_evt_list_last.length; i++ ){
-						block_evt_list_last[i]['peer_name'] = peer_list[i];
-						console.log(peer_list)
+					for( var i=0; i<peer_list.length; i++ ){
+						block_evt_list_last.push({
+							peer_name: peer_list[i],
+							tx_id: tx_id,
+							num: block_num
+						})
 					}
 					socket_conn(block_evt_list_last);
-
 				} else {
 					console.error('Failed to invoke :: ' + err);
 				}
