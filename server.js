@@ -43,16 +43,16 @@ var socket_conn = function (avail) {
     // socket////////////////////////////////////////////////////////
     // console.log("in the socket block #####################################")
     // console.log(avail);
-    var socket_client = io_client.connect('127.0.0.1:5050');
+    var socket_client = io_client.connect('222.239.231.245:5050');
     socket_client['io']['opts'] = {
-        'hostname': "127.0.0.1",
+        'hostname': "222.239.231.245",
         'path': "/socket.io",
         'port': "5050",
         'secure': false
     }
     socket_client['nsp'] = "/";
-    socket_client['io']['uri'] = "http://127.0.0.1:5050";
-    socket_client['io']['engine']['hostname'] = '127.0.0.1';
+    socket_client['io']['uri'] = "http://222.239.231.245:5050";
+    socket_client['io']['engine']['hostname'] = '222.239.231.245';
     socket_client['io']['engine']['port'] = '5050';
     socket_client.on('connect', function () {
         // console.log("connect");

@@ -35,6 +35,8 @@ module.exports = (function () {
         connect_peer: function () {
             this.channel.addPeer(peers[0]);
             this.channel.addPeer(peers[1]);
+            this.channel.addPeer(peers[2]);
+            this.channel.addPeer(peers[3]);
         },
         connect_orderer: function () {
             this.channel.addOrderer(this.orderer);
