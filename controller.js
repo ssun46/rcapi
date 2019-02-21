@@ -109,9 +109,9 @@ module.exports = (function () {
 		init_wallet: function (req, res, fabric_client, evt) {
 			console.log("init_wallet ###################################################")
 			///////////////////////////////////////////////
-			// const data = JSON.parse(req.query.param_data)
+			const data = JSON.parse(req.query.param_data);
 			///////////////////////////////////////////////
-			const data = req.query
+			// const data = req.query
 			const param_userId = data.user_id
 			const param_fromId = data.from_id
 			const param_date = data.date
@@ -276,9 +276,9 @@ module.exports = (function () {
 		publish: function (req, res, fabric_client, evt) {
 			console.log("publish ###################################################")
 			///////////////////////////////////////////////
-			// const data = JSON.parse(req.query.param_data)
+			const data = JSON.parse(req.query.param_data);
 			///////////////////////////////////////////////
-			const data = req.query
+			// const data = req.query
 			const param_userId = data.user_id
 			const param_fromId = data.from_id
 			const param_amount = data.amount
@@ -444,9 +444,9 @@ module.exports = (function () {
 		transfer: function (req, res, fabric_client, evt) {
 			console.log("transfer ###################################################")
 			///////////////////////////////////////////////
-			// const data = JSON.parse(req.query.param_data)
+			const data = JSON.parse(req.query.param_data)
 			///////////////////////////////////////////////
-			const data = req.query
+			// const data = req.query
 			const param_fromId = data.from_id
 			const param_toId = data.to_id
 			const param_amount = data.amount
@@ -1084,9 +1084,6 @@ module.exports = (function () {
 		},
 		node_restart: function (req, res, fabric_client) {
 			console.log("node restart ###################################################");
-			///////////////////////////////////////////////
-			// const data = JSON.parse(req.query.param_data);
-			///////////////////////////////////////////////
 			const channel = fabric_client.get_channel();
 			const peer = fabric_client.get_peer();
 			var store_path = path.join(os.homedir(), '.hfc-key-store');
