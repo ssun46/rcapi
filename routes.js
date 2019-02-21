@@ -16,9 +16,9 @@ con.connect_peer();
 con.connect_orderer();
 var peers = con.get_peer();
 evt_glob.push(con.get_channel().newChannelEventHub(peers[0]));
-evt_glob.push(con.get_channel().newChannelEventHub(peers[1]));
-evt_glob.push(con.get_channel().newChannelEventHub(peers[2]));
-evt_glob.push(con.get_channel().newChannelEventHub(peers[3]));
+// evt_glob.push(con.get_channel().newChannelEventHub(peers[1]));
+// evt_glob.push(con.get_channel().newChannelEventHub(peers[2]));
+// evt_glob.push(con.get_channel().newChannelEventHub(peers[3]));
 fabric = con;
 
 // evt_glob = con.get_channel().newChannelEventHub(con.get_peer());

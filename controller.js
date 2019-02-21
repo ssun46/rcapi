@@ -412,31 +412,24 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
-				socket_conn(block_evt_list);
+				// socket_conn(block_evt_list);
+				const peer_list = [
+					"210.107.78.166:7051",
+					"210.107.78.166:8051",
+					"210.107.78.167:9051",
+					"210.107.78.167:10051"
+				]
+				var block_evt_list_last = [];
 				var regex = "/ChannelEventHub has been shutdown/g";
 				var err_string = err.toString();
+				var block_num = parseInt(last_block);
 				if (err_string.search(regex)) {
-					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
-					var success_evt_peers_name = block_evt_list[0]['peer_name'];
-					// console.log(success_evt_peers_block)
-					// console.log(success_evt_peers_name)
-					// console.log(evt)
-					var block_evt_list_last = [];
-					for (var i = 0; i < evt.length; i++) {
-						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
-							var failed_evt_peers_name = evt[i]['_peer']['_name'];
-							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
-
-								block_evt_list_last.push({
-									peer_name: failed_evt_peers_name,
-									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-									num: result['header']['number']
-								})
-								console.log(failed_evt_peers_name)
-								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
-								
-							});
-						}
+					for( var i=0; i<peer_list.length; i++ ){
+						block_evt_list_last.push({
+							peer_name: peer_list[i],
+							tx_id: tx_id,
+							num: block_num
+						})
 					}
 					socket_conn(block_evt_list_last);
 				} else {
@@ -593,34 +586,26 @@ module.exports = (function () {
 				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
 				res.json(result_of_tx)
 			}).catch((err) => {
-				socket_conn(block_evt_list);
+				// socket_conn(block_evt_list);
+				const peer_list = [
+					"210.107.78.166:7051",
+					"210.107.78.166:8051",
+					"210.107.78.167:9051",
+					"210.107.78.167:10051"
+				]
+				var block_evt_list_last = [];
 				var regex = "/ChannelEventHub has been shutdown/g";
 				var err_string = err.toString();
+				var block_num = parseInt(last_block);
 				if (err_string.search(regex)) {
-					var success_evt_peers_block = parseInt(block_evt_list[0]['num'], 10);
-					var success_evt_peers_name = block_evt_list[0]['peer_name'];
-					// console.log(success_evt_peers_block)
-					// console.log(success_evt_peers_name)
-					// console.log(evt)
-					var block_evt_list_last = [];
-					for (var i = 0; i < evt.length; i++) {
-						if (success_evt_peers_name != evt[i]['_peer']['_name']) {
-							var failed_evt_peers_name = evt[i]['_peer']['_name'];
-							var is_block = channel.queryBlock(success_evt_peers_block, failed_evt_peers_name).then((result) => {
-
-								block_evt_list_last.push({
-									peer_name: failed_evt_peers_name,
-									tx_id: result['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-									num: result['header']['number']
-								})
-								socket_conn(block_evt_list_last);
-								console.log(failed_evt_peers_name)
-								console.log(result['data']['data'][0]['payload']['header']['channel_header']['tx_id']);
-
-							});
-						}
+					for( var i=0; i<peer_list.length; i++ ){
+						block_evt_list_last.push({
+							peer_name: peer_list[i],
+							tx_id: tx_id,
+							num: block_num
+						})
 					}
-					console.log("true#################");
+					socket_conn(block_evt_list_last);
 				} else {
 					console.error('Failed to invoke :: ' + err);
 				}
