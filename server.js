@@ -43,16 +43,16 @@ var socket_conn = function (avail) {
     // socket////////////////////////////////////////////////////////
     // console.log("in the socket block #####################################")
     // console.log(avail);
-    var socket_client = io_client.connect('222.239.231.245:5050');
+    var socket_client = io_client.connect('localhost:5050');
     socket_client['io']['opts'] = {
-        'hostname': "222.239.231.245",
+        'hostname': "localhost",
         'path': "/socket.io",
         'port': "5050",
         'secure': false
     }
     socket_client['nsp'] = "/";
-    socket_client['io']['uri'] = "http://222.239.231.245:5050";
-    socket_client['io']['engine']['hostname'] = '222.239.231.245';
+    socket_client['io']['uri'] = "http://localhost:5050";
+    socket_client['io']['engine']['hostname'] = 'localhost';
     socket_client['io']['engine']['port'] = '5050';
     socket_client.on('connect', function () {
         // console.log("connect");
@@ -69,7 +69,7 @@ var cron = require('node-cron');
 cron.schedule('* * * * * *', () => {
     // 111111111111111111111111111111
     var peer_cfg1 = {
-        address: '210.107.78.166',
+        address: 'localhost',
         port: '7051'
     }
     tcpp.probe(peer_cfg1.address, peer_cfg1.port, function (err, avail) {
@@ -83,7 +83,7 @@ cron.schedule('* * * * * *', () => {
     });
     // 22222222222222222222222222222222
     var peer_cfg2 = {
-        address: '210.107.78.166',
+        address: 'localhost',
         port: '8051'
     }
     tcpp.probe(peer_cfg2.address, peer_cfg2.port, function (err, avail) {

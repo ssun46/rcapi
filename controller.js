@@ -11,16 +11,16 @@ var socket_conn = function (blocks) {
 	// socket////////////////////////////////////////////////////////
 	console.log("in the socket block #####################################")
 	console.log(blocks);
-	var socket = io.connect('210.107.78.166:4000');
+	var socket = io.connect('127.0.0.1:4000');
 	socket['io']['opts'] = {
-		'hostname': "210.107.78.166",
+		'hostname': "127.0.0.1",
 		'path': "/socket.io",
 		'port': "4000",
 		'secure': false
 	}
 	socket['nsp'] = "/";
-	socket['io']['uri'] = "http://210.107.78.166:4000";
-	socket['io']['engine']['hostname'] = '210.107.78.166';
+	socket['io']['uri'] = "http://127.0.0.1:4000";
+	socket['io']['engine']['hostname'] = '127.0.0.1';
 	socket['io']['engine']['port'] = '4000';
 	socket.on('connect', function () {
 		console.log("connect");
@@ -104,174 +104,249 @@ var tx_listener = function (channel, peer, event_hub, tx_id) {
 	return txPromise;
 }
 
+var exec_tx = function (res, fabric_client, result_of_tx,  func_name, param_list, evt) {
+
+	const channel = fabric_client.get_channel();
+	const peer = fabric_client.get_peer();
+	var store_path = path.join(os.homedir(), '.hfc-key-store');
+	console.log('Store path:' + store_path);
+	
+	var tx_id = null;
+	let block_evt_list = [];
+
+	// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
+	Fabric_Client.newDefaultKeyValueStore({
+		path: store_path
+	}).then((state_store) => {
+		// assign the store to the fabric client
+		fabric_client.fabric_client.setStateStore(state_store);
+		var crypto_suite = Fabric_Client.newCryptoSuite();
+		// use the same location for the state store (where the users' certificate are kept)
+		// and the crypto store (where the users' keys are kept)
+		var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
+		crypto_suite.setCryptoKeyStore(crypto_store);
+		fabric_client.fabric_client.setCryptoSuite(crypto_suite);
+
+		// get the enrolled user from persistence, this user will sign all requests
+		return fabric_client.fabric_client.getUserContext('admin', true);
+	}).then((user_from_store) => {
+		if (user_from_store && user_from_store.isEnrolled()) {
+			console.log('Successfully loaded admin from persistence');
+			member_user = user_from_store;
+		} else {
+			throw new Error('Failed to get admin.... run registerAdmin.js');
+		}
+
+		// get a transaction id object based on the current user assigned to fabric client
+		tx_id = fabric_client.fabric_client.newTransactionID();
+		console.log("Assigning transaction_id: ", tx_id._transaction_id);
+
+		/////////////////////////////////////////////////////////////////////////////
+		//                      send transaction proposal
+		/////////////////////////////////////////////////////////////////////////////
+		var request = {
+			chaincodeId: 'rc_cc',
+			fcn: func_name,
+			args: param_list,
+			chainId: 'channelrc',
+			txId: tx_id
+		};
+		
+		// send the transaction proposal to the peers
+		return channel.sendTransactionProposal(request);
+	}).then((results) => {
+		console.log("after proposal ##########################################")
+		var proposalResponses = results[0];
+		var proposal = results[1];
+		console.log(proposalResponses)
+		let isProposalGood = false;
+		if (proposalResponses && proposalResponses[0].response &&
+			proposalResponses[0].response.status === 200) {
+			isProposalGood = true;
+			console.log('Transaction proposal was good');
+		} else {
+			console.error('Transaction proposal was bad');
+			result_of_tx['message'] = proposalResponses[0].response;
+		}
+		if (isProposalGood) {
+			console.log(util.format(
+				'Successfully sent Proposal and received ProposalResponse: Status - %s, payload - "%s", proposal - "%s"',
+				proposalResponses[0].response.status, proposalResponses[0].response.payload, proposal));
+
+			// result for final response
+			// result_of_tx = proposalResponses[0].response.payload
+
+			// build up the request for the orderer to have the transaction committed
+			var request = {
+				proposalResponses: proposalResponses,
+				proposal: proposal
+			};
+
+			var transaction_id_string = tx_id.getTransactionID(); //Get the transaction ID string to be used by the event processing
+			var promises = [];
+
+			var sendPromise = channel.sendTransaction(request);
+			promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
+
+			// get an eventhub once the fabric client has a user assigned. The user
+			// is required bacause the event registration must be signed
+
+			// event listeners
+			let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
+
+			promises.push(txPromise);
+
+			return Promise.all(promises);
+		} else {
+			result_of_tx['result'] = 'fail'
+			res.json(result_of_tx);
+			res.end();
+			console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
+			throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
+		}
+	}).then((results) => {
+		var blockPromise = [];
+		if (results) {
+			for (var i = 0; i < evt.length; i++) {
+				console.log("blockpromise #######################################")
+				blockPromise[i] = block_listener(channel, evt[i]);
+				blockPromise[i].then((result) => {
+					console.log(result)
+					block_evt_list.push(result);
+				});
+			}
+		}
+		return Promise.all(blockPromise);
+	}).then((results) => {
+		// socket emit
+		console.log("block then results #############################")
+		console.log(block_evt_list.length)
+		socket_conn(block_evt_list);
+		console.log('Send transaction promise and event listener promise have completed');
+		result_of_tx['result'] = 'success'
+		console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
+		res.json(result_of_tx);
+		res.end();
+	}).catch((err) => {
+		console.log("err#######################")
+		console.log(err)
+		var regex = "/ChannelEventHub has been shutdown/g";
+		var err_string = err.toString();
+		var block_num = parseInt(last_block);
+		if (err_string.search(regex)) {
+			socket_conn({
+				peer_name: "127.0.0.1:7051",
+				tx_id: tx_id['tx_id']['_transaction_id'],
+				num: block_num
+			});
+		} else {
+			result_of_tx['result'] = 'fail'
+			console.error('Failed to invoke :: ' + err);
+		}
+		console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
+		res.json(result_of_tx);
+		res.end();
+	});
+}
+
+var exec_query = function (res, fabric_client, result_of_tx, func_name, param_list) {
+
+	const channel = fabric_client.get_channel();
+	const peer = fabric_client.get_peer();
+	var store_path = path.join(os.homedir(), '.hfc-key-store');
+	console.log('Store path:' + store_path);
+	var tx_id = null;
+
+	Fabric_Client.newDefaultKeyValueStore({
+		path: store_path
+	}).then((state_store) => {
+		// assign the store to the fabric client
+		fabric_client.fabric_client.setStateStore(state_store);
+		var crypto_suite = Fabric_Client.newCryptoSuite();
+		// use the same location for the state store (where the users' certificate are kept)
+		// and the crypto store (where the users' keys are kept)
+		var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
+		crypto_suite.setCryptoKeyStore(crypto_store);
+		fabric_client.fabric_client.setCryptoSuite(crypto_suite);
+
+		// get the enrolled user from persistence, this user will sign all requests
+		return fabric_client.fabric_client.getUserContext('admin', true);
+	}).then((user_from_store) => {
+		if (user_from_store && user_from_store.isEnrolled()) {
+			console.log('Successfully loaded admin from persistence');
+			member_user = user_from_store;
+		} else {
+			throw new Error('Failed to get admin.... run registerAdmin.js');
+		}
+
+		/////////////////////////////////////////////////////////////////////////////
+		//                      send transaction proposal
+		/////////////////////////////////////////////////////////////////////////////
+		var request = {
+			chaincodeId: 'rc_cc',
+			fcn: func_name,
+			args: param_list,
+			chainId: 'channelrc',
+			txId: tx_id
+		};
+
+		// send the query proposal to the peer
+		return channel.queryByChaincode(request);
+	}).then((query_responses) => {
+		console.log("#####################################");
+		console.log("response for query###################");
+		console.log(query_responses[1]);
+		console.log("#####################################");
+		// query_responses could have more than one  results if there multiple peers were used as targets
+		if (query_responses) {
+			if (query_responses[0] instanceof Error) {
+				console.error("error from query = ", query_responses[0]);
+				result_of_tx['result'] = 'fail'
+				result_of_tx['message'] = query_responses[0].message;
+				res.json(result_of_tx);
+			} else {
+				console.log("Response is ", query_responses[0]);
+				result_of_tx['result'] = 'success'
+				result_of_tx['value'] = query_responses[0].toString();
+				res.json(result_of_tx);
+			}
+		} else {
+			console.log("No payloads were returned from query");
+		}
+	}).catch((err) => {
+		console.error('Failed to query successfully :: ' + err);
+		result_of_tx['message'] = err;
+		result_of_tx['result'] = 'fail'
+		res.json(result_of_tx)
+	});
+}
+
 module.exports = (function () {
 	return {
 		init_wallet: function (req, res, fabric_client, evt) {
 			console.log("init_wallet ###################################################")
 			///////////////////////////////////////////////
-			const data = JSON.parse(req.query.param_data);
+			// const data = JSON.parse(req.query.param_data);
 			///////////////////////////////////////////////
-			// const data = req.query
-			const param_userId = data.user_id
-			const param_fromId = data.from_id
-			const param_date = data.date
+			const data = req.query;
+			const param_userId = data.user_id;
+			const param_fromId = data.from_id;
+			const param_date = data.date;
 			console.log("###################################################")
 			console.log(param_userId + ":" + param_fromId + ":" + param_date)
 			console.log("###################################################")
 
-			const channel = fabric_client.get_channel();
-			const peer = fabric_client.get_peer();
-			var store_path = path.join(os.homedir(), '.hfc-key-store');
-			console.log('Store path:' + store_path);
-			var tx_id = null;
+			var func_name = "init_wallet";
+			var param_list = []
+			param_list.push(param_userId);
+			param_list.push(param_fromId);
+			param_list.push(param_date);
 			var result_of_tx = {};
-			let block_evt_list = [];
 			result_of_tx['userId'] = param_userId;
 			result_of_tx['fromId'] = param_fromId;
 			result_of_tx['date'] = param_date;
 
-			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
-			Fabric_Client.newDefaultKeyValueStore({
-				path: store_path
-			}).then((state_store) => {
-				console.log("after set key path ##################################")
-				// assign the store to the fabric client
-				fabric_client.fabric_client.setStateStore(state_store);
-				var crypto_suite = Fabric_Client.newCryptoSuite();
-				// use the same location for the state store (where the users' certificate are kept)
-				// and the crypto store (where the users' keys are kept)
-				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
-				crypto_suite.setCryptoKeyStore(crypto_store);
-				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
-
-				// get the enrolled user from persistence, this user will sign all requests
-				return fabric_client.fabric_client.getUserContext('admin', true);
-			}).then((user_from_store) => {
-				console.log("after get user ##################################")
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get admin.... run registerAdmin.js');
-				}
-
-				// get a transaction id object based on the current user assigned to fabric client
-				tx_id = fabric_client.fabric_client.newTransactionID();
-				console.log("Assigning transaction_id: ", tx_id._transaction_id);
-
-				/////////////////////////////////////////////////////////////////////////////
-				//                                  init_wallet
-				/////////////////////////////////////////////////////////////////////////////
-				var request = {
-					chaincodeId: 'rc_cc',
-					fcn: 'init_wallet',
-					args: [param_userId, param_fromId, param_date],
-					chainId: 'channelrc',
-					txId: tx_id
-				};
-
-				// send the transaction proposal to the peers
-				return channel.sendTransactionProposal(request);
-			}).then((results) => {
-				console.log("after proposal ##########################################")
-				var proposalResponses = results[0];
-				var proposal = results[1];
-				console.log(proposal)
-				let isProposalGood = false;
-				if (proposalResponses && proposalResponses[0].response &&
-					proposalResponses[0].response.status === 200) {
-					isProposalGood = true;
-					console.log('Transaction proposal was good');
-				} else {
-					console.error('Transaction proposal was bad');
-					result_of_tx['message'] = proposalResponses[0].response;
-				}
-				if (isProposalGood) {
-					console.log(util.format(
-						'Successfully sent Proposal and received ProposalResponse: Status - %s, payload - "%s", proposal - "%s"',
-						proposalResponses[0].response.status, proposalResponses[0].response.payload, proposal));
-
-					// result for final response
-					// result_of_tx = proposalResponses[0].response.payload
-
-					// build up the request for the orderer to have the transaction committed
-					var request = {
-						proposalResponses: proposalResponses,
-						proposal: proposal
-					};
-
-					var transaction_id_string = tx_id.getTransactionID(); //Get the transaction ID string to be used by the event processing
-					var promises = [];
-
-					var sendPromise = channel.sendTransaction(request);
-					promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
-
-					// get an eventhub once the fabric client has a user assigned. The user
-					// is required bacause the event registration must be signed
-
-					// event listeners
-					let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
-
-					promises.push(txPromise);
-
-					return Promise.all(promises);
-				} else {
-					result_of_tx['result'] = 'fail'
-					res.json(result_of_tx);
-					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-					throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-				}
-			}).then((results) => {
-				var blockPromise = [];
-				if (results) {
-					for (var i = 0; i < evt.length; i++) {
-						console.log("blockpromise #######################################")
-						blockPromise[i] = block_listener(channel, evt[i]);
-						blockPromise[i].then((result) => {
-							console.log(result)
-							block_evt_list.push(result);
-						});
-					}
-				}
-				return Promise.all(blockPromise);
-			}).then((results) => {
-				// socket emit
-				console.log("block then results #############################")
-				console.log(block_evt_list.length)
-				socket_conn(block_evt_list);
-				console.log('Send transaction promise and event listener promise have completed');
-				result_of_tx['result'] = 'success'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
-				res.json(result_of_tx)
-			}).catch((err) => {
-				// socket_conn(block_evt_list);
-				const peer_list = [
-					"210.107.78.166:7051",
-					"210.107.78.166:8051",
-					"210.107.78.167:9051",
-					"210.107.78.167:10051"
-				]
-				var block_evt_list_last = [];
-				var regex = "/ChannelEventHub has been shutdown/g";
-				var err_string = err.toString();
-				var block_num = parseInt(last_block);
-				if (err_string.search(regex)) {
-					for( var i=0; i<peer_list.length; i++ ){
-						block_evt_list_last.push({
-							peer_name: peer_list[i],
-							tx_id: tx_id,
-							num: block_num
-						})
-					}
-					socket_conn(block_evt_list_last);
-				} else {
-					console.error('Failed to invoke :: ' + err);
-				}
-				result_of_tx['result'] = 'fail'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
-				res.send(result_of_tx);
-			});
-
+			exec_tx(res, fabric_client, result_of_tx, func_name, param_list, evt);
 		},
 		publish: function (req, res, fabric_client, evt) {
 			console.log("publish ###################################################")
@@ -287,159 +362,20 @@ module.exports = (function () {
 			console.log(param_userId + ":" + param_fromId + ":" + param_amount + ":" + param_date)
 			console.log("###################################################")
 
-			const channel = fabric_client.get_channel();
-			const peer = fabric_client.get_peer();
-
-			var store_path = path.join(os.homedir(), '.hfc-key-store');
-			console.log('Store path:' + store_path);
-			var tx_id = null;
+			var func_name = "publish";
+			var param_list = []
+			param_list.push(param_userId);
+			param_list.push(param_fromId);
+			param_list.push(param_amount);
+			param_list.push(param_date);
 			var result_of_tx = {};
-			let block_evt_list = [];
+			var result_of_tx = {};
 			result_of_tx['userId'] = param_userId;
 			result_of_tx['fromId'] = param_fromId;
 			result_of_tx['amount'] = param_amount;
 			result_of_tx['date'] = param_date;
 
-			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
-			Fabric_Client.newDefaultKeyValueStore({
-				path: store_path
-			}).then((state_store) => {
-				// assign the store to the fabric client
-				fabric_client.fabric_client.setStateStore(state_store);
-				var crypto_suite = Fabric_Client.newCryptoSuite();
-				// use the same location for the state store (where the users' certificate are kept)
-				// and the crypto store (where the users' keys are kept)
-				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
-				crypto_suite.setCryptoKeyStore(crypto_store);
-				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
-
-				// get the enrolled user from persistence, this user will sign all requests
-				return fabric_client.fabric_client.getUserContext('admin', true);
-			}).then((user_from_store) => {
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get admin.... run registerAdmin.js');
-				}
-
-				// get a transaction id object based on the current user assigned to fabric client
-				tx_id = fabric_client.fabric_client.newTransactionID();
-				console.log("Assigning transaction_id: ", tx_id._transaction_id);
-
-				/////////////////////////////////////////////////////////////////////////////
-				//                                  publish
-				/////////////////////////////////////////////////////////////////////////////
-				var request = {
-					chaincodeId: 'rc_cc',
-					fcn: 'publish',
-					args: [param_userId, param_fromId, param_amount, param_date],
-					chainId: 'channelrc',
-					txId: tx_id
-				};
-
-				// send the transaction proposal to the peers
-				return channel.sendTransactionProposal(request);
-			}).then((results) => {
-				console.log("after proposal ##########################################")
-				var proposalResponses = results[0];
-				var proposal = results[1];
-				console.log(proposal)
-				let isProposalGood = false;
-				if (proposalResponses && proposalResponses[0].response &&
-					proposalResponses[0].response.status === 200) {
-					isProposalGood = true;
-					console.log('Transaction proposal was good');
-				} else {
-					console.error('Transaction proposal was bad');
-					result_of_tx['message'] = proposalResponses[0].response;
-				}
-				if (isProposalGood) {
-					console.log(util.format(
-						'Successfully sent Proposal and received ProposalResponse: Status - %s, payload - "%s", proposal - "%s"',
-						proposalResponses[0].response.status, proposalResponses[0].response.payload, proposal));
-
-					// result for final response
-					// result_of_tx = proposalResponses[0].response.payload
-
-					// build up the request for the orderer to have the transaction committed
-					var request = {
-						proposalResponses: proposalResponses,
-						proposal: proposal
-					};
-
-					var transaction_id_string = tx_id.getTransactionID(); //Get the transaction ID string to be used by the event processing
-					var promises = [];
-
-					var sendPromise = channel.sendTransaction(request);
-					promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
-
-					// get an eventhub once the fabric client has a user assigned. The user
-					// is required bacause the event registration must be signed
-
-					// event listeners
-					let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
-
-					promises.push(txPromise);
-
-					return Promise.all(promises);
-				} else {
-					result_of_tx['result'] = 'fail'
-					res.json(result_of_tx);
-					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-					throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-				}
-			}).then((results) => {
-				var blockPromise = [];
-				if (results) {
-					for (var i = 0; i < evt.length; i++) {
-						console.log("blockpromise #######################################")
-						blockPromise[i] = block_listener(channel, evt[i]);
-						blockPromise[i].then((result) => {
-							console.log(result)
-							block_evt_list.push(result);
-						});
-					}
-				}
-				return Promise.all(blockPromise);
-			}).then((results) => {
-				// socket emit
-				console.log("block then results #############################")
-				console.log(block_evt_list.length)
-				socket_conn(block_evt_list);
-				console.log('Send transaction promise and event listener promise have completed');
-				result_of_tx['result'] = 'success'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
-				res.json(result_of_tx)
-			}).catch((err) => {
-				// socket_conn(block_evt_list);
-				const peer_list = [
-					"210.107.78.166:7051",
-					"210.107.78.166:8051",
-					"210.107.78.167:9051",
-					"210.107.78.167:10051"
-				]
-				var block_evt_list_last = [];
-				var regex = "/ChannelEventHub has been shutdown/g";
-				var err_string = err.toString();
-				var block_num = parseInt(last_block);
-				if (err_string.search(regex)) {
-					for( var i=0; i<peer_list.length; i++ ){
-						block_evt_list_last.push({
-							peer_name: peer_list[i],
-							tx_id: tx_id,
-							num: block_num
-						})
-					}
-					socket_conn(block_evt_list_last);
-				} else {
-					console.error('Failed to invoke :: ' + err);
-				}
-				result_of_tx['result'] = 'fail'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
-				res.send(result_of_tx);
-			});
-
+			exec_tx(res, fabric_client, result_of_tx, func_name, param_list, evt);
 		},
 		transfer: function (req, res, fabric_client, evt) {
 			console.log("transfer ###################################################")
@@ -462,158 +398,28 @@ module.exports = (function () {
 
 			var store_path = path.join(os.homedir(), '.hfc-key-store');
 			console.log('Store path:' + store_path);
-			var tx_id = null;
 			var result_of_tx = {};
-			let block_evt_list = [];
 			result_of_tx['fromId'] = param_fromId;
 			result_of_tx['toId'] = param_toId;
 			result_of_tx['amount'] = param_amount;
 			result_of_tx['type'] = param_type;
 			result_of_tx['date'] = param_date;
 
-			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
-			Fabric_Client.newDefaultKeyValueStore({
-				path: store_path
-			}).then((state_store) => {
-				// assign the store to the fabric client
-				fabric_client.fabric_client.setStateStore(state_store);
-				var crypto_suite = Fabric_Client.newCryptoSuite();
-				// use the same location for the state store (where the users' certificate are kept)
-				// and the crypto store (where the users' keys are kept)
-				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
-				crypto_suite.setCryptoKeyStore(crypto_store);
-				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
+			var func_name = "transfer";
+			var param_list = []
+			param_list.push(param_userId);
+			param_list.push(param_fromId);
+			param_list.push(param_amount);
+			param_list.push(param_type);
+			param_list.push(param_date);
+			var result_of_tx = {};
+			var result_of_tx = {};
+			result_of_tx['userId'] = param_userId;
+			result_of_tx['fromId'] = param_fromId;
+			result_of_tx['amount'] = param_amount;
+			result_of_tx['date'] = param_date;
 
-				// get the enrolled user from persistence, this user will sign all requests
-				return fabric_client.fabric_client.getUserContext('admin', true);
-			}).then((user_from_store) => {
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get admin.... run registerAdmin.js');
-				}
-
-				// get a transaction id object based on the current user assigned to fabric client
-				tx_id = fabric_client.fabric_client.newTransactionID();
-				console.log("Assigning transaction_id: ", tx_id._transaction_id);
-
-				/////////////////////////////////////////////////////////////////////////////
-				//                                  transfer
-				// '{"Args":["transfer", "yang", "lee", "10", "1", "2"]}'
-				/////////////////////////////////////////////////////////////////////////////
-				var request = {
-					chaincodeId: 'rc_cc',
-					fcn: 'transfer',
-					args: [param_fromId, param_toId, param_amount, param_type, param_date],
-					chainId: 'channelrc',
-					txId: tx_id
-				};
-				console.log("tx_id############################################")
-				console.log(tx_id['_transaction_id'])
-				console.log(tx_id)
-				// send the transaction proposal to the peers
-				return channel.sendTransactionProposal(request);
-			}).then((results) => {
-				console.log("after proposal ##########################################")
-				var proposalResponses = results[0];
-				var proposal = results[1];
-				console.log(proposal)
-				let isProposalGood = false;
-				if (proposalResponses && proposalResponses[0].response &&
-					proposalResponses[0].response.status === 200) {
-					isProposalGood = true;
-					console.log('Transaction proposal was good');
-				} else {
-					console.error('Transaction proposal was bad');
-					result_of_tx['message'] = proposalResponses[0].response;
-				}
-				if (isProposalGood) {
-					console.log(util.format(
-						'Successfully sent Proposal and received ProposalResponse: Status - %s, payload - "%s", proposal - "%s"',
-						proposalResponses[0].response.status, proposalResponses[0].response.payload, proposal));
-
-					// result for final response
-					// result_of_tx = proposalResponses[0].response.payload
-
-					// build up the request for the orderer to have the transaction committed
-					var request = {
-						proposalResponses: proposalResponses,
-						proposal: proposal
-					};
-
-					var transaction_id_string = tx_id.getTransactionID(); //Get the transaction ID string to be used by the event processing
-					var promises = [];
-
-					var sendPromise = channel.sendTransaction(request);
-					promises.push(sendPromise); //we want the send transaction first, so that we know where to check status
-
-					// get an eventhub once the fabric client has a user assigned. The user
-					// is required bacause the event registration must be signed
-
-					// event listeners
-					let txPromise = tx_listener(channel, peer, evt[0], transaction_id_string);
-
-					promises.push(txPromise);
-
-					return Promise.all(promises);
-				} else {
-					result_of_tx['result'] = 'fail'
-					res.json(result_of_tx);
-					console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-					throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
-				}
-			}).then((results) => {
-				var blockPromise = [];
-				if (results) {
-					for (var i = 0; i < evt.length; i++) {
-						console.log("blockpromise #######################################")
-						blockPromise[i] = block_listener(channel, evt[i]);
-						blockPromise[i].then((result) => {
-							console.log(result)
-							block_evt_list.push(result);
-						});
-					}
-				}
-				return Promise.all(blockPromise);
-			}).then((results) => {
-				// socket emit
-				console.log("block then results #############################")
-				console.log(block_evt_list.length)
-				socket_conn(block_evt_list);
-				console.log('Send transaction promise and event listener promise have completed');
-				result_of_tx['result'] = 'success'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
-				res.json(result_of_tx)
-			}).catch((err) => {
-				// socket_conn(block_evt_list);
-				const peer_list = [
-					"210.107.78.166:7051",
-					"210.107.78.166:8051",
-					"210.107.78.167:9051",
-					"210.107.78.167:10051"
-				]
-				var block_evt_list_last = [];
-				var regex = "/ChannelEventHub has been shutdown/g";
-				var err_string = err.toString();
-				var block_num = parseInt(last_block);
-				if (err_string.search(regex)) {
-					for( var i=0; i<peer_list.length; i++ ){
-						block_evt_list_last.push({
-							peer_name: peer_list[i],
-							tx_id: tx_id,
-							num: block_num
-						})
-					}
-					socket_conn(block_evt_list_last);
-				} else {
-					console.error('Failed to invoke :: ' + err);
-				}
-				result_of_tx['result'] = 'fail'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length))
-				res.send(result_of_tx);
-			});
-
+			exec_tx(res, fabric_client, result_of_tx, func_name, param_list, evt);
 		},
 		get_account: function (req, res, fabric_client) {
 			console.log("get_account ###################################################")
@@ -627,78 +433,13 @@ module.exports = (function () {
 			console.log(param_userId)
 			console.log("###################################################")
 
-			const channel = fabric_client.get_channel();
-
-			var store_path = path.join(os.homedir(), '.hfc-key-store');
-			console.log('Store path:' + store_path);
-			var tx_id = null;
+			var func_name = "get_account";
+			var param_list = []
+			param_list.push(param_userId);
 			var result_of_tx = {};
 			result_of_tx['userId'] = param_userId;
 
-			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
-			Fabric_Client.newDefaultKeyValueStore({
-				path: store_path
-			}).then((state_store) => {
-				// assign the store to the fabric client
-				fabric_client.fabric_client.setStateStore(state_store);
-				var crypto_suite = Fabric_Client.newCryptoSuite();
-				// use the same location for the state store (where the users' certificate are kept)
-				// and the crypto store (where the users' keys are kept)
-				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
-				crypto_suite.setCryptoKeyStore(crypto_store);
-				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
-
-				// get the enrolled user from persistence, this user will sign all requests
-				return fabric_client.fabric_client.getUserContext('admin', true);
-			}).then((user_from_store) => {
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get admin.... run registerAdmin.js');
-				}
-
-				/////////////////////////////////////////////////////////////////////////////
-				//                                  get_account
-				/////////////////////////////////////////////////////////////////////////////
-				var request = {
-					//targets : --- letting this default to the peers assigned to the channel
-					chaincodeId: 'rc_cc',
-					fcn: 'get_account',
-					args: [param_userId],
-					chainId: 'channelrc',
-					txId: tx_id
-				};
-
-				// send the query proposal to the peer
-				return channel.queryByChaincode(request);
-			}).then((query_responses) => {
-				console.log("#####################################");
-				console.log("response for query###################");
-				console.log(query_responses[1].toString())
-				console.log("#####################################");
-				// query_responses could have more than one  results if there multiple peers were used as targets
-				if (query_responses) {
-					if (query_responses[0] instanceof Error) {
-						console.error("error from query = ", query_responses[0].toString());
-						result_of_tx['result'] = 'fail'
-						result_of_tx['message'] = query_responses[0].message;
-						res.json(result_of_tx);
-					} else {
-						console.log("Response is ", query_responses[0].toString());
-						result_of_tx['result'] = 'success'
-						result_of_tx['value'] = query_responses[0].toString();
-						res.json(result_of_tx);
-					}
-				} else {
-					console.log("No payloads were returned from query");
-				}
-			}).catch((err) => {
-				console.error('Failed to query successfully :: ' + err);
-				result_of_tx['message'] = err;
-				result_of_tx['result'] = 'fail'
-				res.json(result_of_tx)
-			});
+			exec_query(res, fabric_client, result_of_tx, func_name, param_list);
 		},
 		get_txList: function (req, res, fabric_client) {
 			console.log("get_txList ###################################################")
@@ -944,12 +685,6 @@ module.exports = (function () {
 		},
 		get_default_block: function (req, res, fabric_client) {
 
-			const peer_list = [
-				"210.107.78.166:7051",
-				"210.107.78.166:8051",
-				"210.107.78.167:9051",
-				"210.107.78.167:10051"
-			]
 			const channel = fabric_client.get_channel();
 
 			var store_path = path.join(os.homedir(), '.hfc-key-store');
@@ -972,31 +707,9 @@ module.exports = (function () {
 				// get the enrolled user from persistence, this user will sign all requests
 				return fabric_client.fabric_client.getUserContext('admin', true);
 			}).then((user_from_store) => {
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get user1.... run registerAdmin.js');
-				}
-				var block_num = parseInt(last_block);
-				var block_list = [];
-				for (var i = 0; i < peer_list.length; i++) {
-					block_list[i] = channel.queryBlock(block_num, peer_list[i]).then((result) => {
-						return result;
-					});
-				}
-				return Promise.all(block_list);
-			}).then((result) => {
-				for (var i = 0; i < result.length; i++) {
 					result_list.push({
-						peer_name: peer_list[i],
-						tx_id: result[i]['data']['data'][0]['payload']['header']['channel_header']['tx_id'],
-						num: result[i]['header']['number'],
-						ip: peer_list[i].substr(0, peer_list[i].indexOf(":")),
-						port: peer_list[i].substr(peer_list[i].indexOf(":")+1),
-						index: i+1
+						num: last_block
 					})
-				}
 				res.json(result_list);
 			}).catch((err) => {
 				console.error('Failed to query successfully :: ' + err);

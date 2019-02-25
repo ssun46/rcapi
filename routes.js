@@ -7,11 +7,11 @@ let evt_glob = [];
 
 con.init_fabric();
 con.set_channel('channelrc');
-con.set_peer('grpc://210.107.78.166:8051');
-con.set_peer('grpc://210.107.78.166:7051');
-con.set_peer('grpc://210.107.78.167:9051');
-con.set_peer('grpc://210.107.78.167:10051');
-con.set_orderer('grpc://210.107.78.166:7050');
+con.set_peer('grpc://127.0.0.1:7051');
+// con.set_peer('grpc://127.0.0.1:8051');
+// con.set_peer('grpc://210.107.78.167:9051');
+// con.set_peer('grpc://210.107.78.167:10051');
+con.set_orderer('grpc://127.0.0.1:7050');
 con.connect_peer();
 con.connect_orderer();
 var peers = con.get_peer();
