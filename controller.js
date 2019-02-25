@@ -326,9 +326,9 @@ module.exports = (function () {
 		init_wallet: function (req, res, fabric_client, evt) {
 			console.log("init_wallet ###################################################")
 			///////////////////////////////////////////////
-			// const data = JSON.parse(req.query.param_data);
+			const data = JSON.parse(req.query.param_data);
 			///////////////////////////////////////////////
-			const data = req.query;
+			// const data = req.query;
 			const param_userId = data.user_id;
 			const param_fromId = data.from_id;
 			const param_date = data.date;
