@@ -797,107 +797,109 @@ module.exports = (function () {
 		},
 		node_restart: function (req, res, fabric_client) {
 			console.log("node restart ###################################################");
-			const channel = fabric_client.get_channel();
-			const peer = fabric_client.get_peer();
-			var store_path = path.join(os.homedir(), '.hfc-key-store');
-			console.log('Store path:' + store_path);
-			var tx_id = null;
-			var result_of_tx = {};
+			// const channel = fabric_client.get_channel();
+			// const peer = fabric_client.get_peer();
+			// var store_path = path.join(os.homedir(), '.hfc-key-store');
+			// console.log('Store path:' + store_path);
+			// var tx_id = null;
+			// var result_of_tx = {};
 
-			// create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
-			Fabric_Client.newDefaultKeyValueStore({
-				path: store_path
-			}).then((state_store) => {
-				console.log("after set key path ##################################")
-				// assign the store to the fabric client
-				fabric_client.fabric_client.setStateStore(state_store);
-				var crypto_suite = Fabric_Client.newCryptoSuite();
-				// use the same location for the state store (where the users' certificate are kept)
-				// and the crypto store (where the users' keys are kept)
-				var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
-				crypto_suite.setCryptoKeyStore(crypto_store);
-				fabric_client.fabric_client.setCryptoSuite(crypto_suite);
+			// // create the key value store as defined in the fabric-client/config/default.json 'key-value-store' setting
+			// Fabric_Client.newDefaultKeyValueStore({
+			// 	path: store_path
+			// }).then((state_store) => {
+			// 	console.log("after set key path ##################################")
+			// 	// assign the store to the fabric client
+			// 	fabric_client.fabric_client.setStateStore(state_store);
+			// 	var crypto_suite = Fabric_Client.newCryptoSuite();
+			// 	// use the same location for the state store (where the users' certificate are kept)
+			// 	// and the crypto store (where the users' keys are kept)
+			// 	var crypto_store = Fabric_Client.newCryptoKeyStore({ path: store_path });
+			// 	crypto_suite.setCryptoKeyStore(crypto_store);
+			// 	fabric_client.fabric_client.setCryptoSuite(crypto_suite);
 
-				// get the enrolled user from persistence, this user will sign all requests
-				return fabric_client.fabric_client.getUserContext('admin', true);
-			}).then((user_from_store) => {
-				console.log("after get user ##################################")
-				if (user_from_store && user_from_store.isEnrolled()) {
-					console.log('Successfully loaded admin from persistence');
-					member_user = user_from_store;
-				} else {
-					throw new Error('Failed to get admin.... run registerAdmin.js');
-				}
-
-				// get a transaction id object based on the current user assigned to fabric client
-				tx_id = fabric_client.fabric_client.newTransactionID();
-				console.log("Assigning transaction_id: ", tx_id._transaction_id);
-
-				let g_request = {
-					txId: tx_id
-				};
-
-				// get the genesis block from the orderer
-				channel.getGenesisBlock(g_request).then((block) => {
-					genesis_block = block;
-					tx_id = fabric_client.fabric_client.newTransactionID();
-					let j_request = {
-						targets: ['localhost:7051'],
-						block: genesis_block,
-						txId: {
-							// signer_or_userContext: 
-							// {
-							// 	role: {
-							// 		name: "admin", 
-							// 		mspId: "Admin"
-							// 	},
-							// 	OrganizationUnit: ,
-							// 	Identity: 
-							// },
-							admin: true
-						}
-					};
-
-					console.log(JSON.stringify(j_request))
-
-					// send genesis block to the peer
-					return channel.joinChannel(j_request);
-				}).then((results) => {
-					if (results && results.response && results.response.status == 200) {
-						console.log('Joined correctly')
-					} else {
-						console.log('Failed', results)
-					}
-				});
-			}).then((results) => {
-				// socket emit
-				console.log('Send transaction promise and event listener promise have completed');
-				result_of_tx['result'] = 'success'
-				console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
-				res.json(result_of_tx)
-			})
-
-			// console.log(data.peer);
-			// console.log(data.chaincode);
-
-			// var peer = data.peer;
-			// var chaincode = data.chaincode; 
-			// var cmd = "docker start " + peer + " " + chaincode;
-
-			// exec(cmd, function(err, stdout, stderr){
-			// 	console.log("err");
-			// 	console.log(err);
-			// 	console.log("stdout");
-			// 	console.log(stdout);
-			// 	console.log("stderr");
-			// 	console.log(stderr);
-			// 	if( !err ){
-			// 		var cmd_child = "docker ps -a";
-			// 		exec(cmd_child, function(err, stdout, stderr){
-			// 			res.send(stdout);
-			// 		});
+			// 	// get the enrolled user from persistence, this user will sign all requests
+			// 	return fabric_client.fabric_client.getUserContext('admin', true);
+			// }).then((user_from_store) => {
+			// 	console.log("after get user ##################################")
+			// 	if (user_from_store && user_from_store.isEnrolled()) {
+			// 		console.log('Successfully loaded admin from persistence');
+			// 		member_user = user_from_store;
+			// 	} else {
+			// 		throw new Error('Failed to get admin.... run registerAdmin.js');
 			// 	}
-			// });
+
+			// 	// get a transaction id object based on the current user assigned to fabric client
+			// 	tx_id = fabric_client.fabric_client.newTransactionID();
+			// 	console.log("Assigning transaction_id: ", tx_id._transaction_id);
+
+			// 	let g_request = {
+			// 		txId: tx_id
+			// 	};
+
+			// 	// get the genesis block from the orderer
+			// 	channel.getGenesisBlock(g_request).then((block) => {
+			// 		genesis_block = block;
+			// 		tx_id = fabric_client.fabric_client.newTransactionID();
+			// 		let j_request = {
+			// 			targets: ['localhost:7051'],
+			// 			block: genesis_block,
+			// 			txId: {
+			// 				signer_or_userContext: 
+			// 				{
+			// 					role: {
+			// 						name: "admin", 
+			// 						mspId: "Admin"
+			// 					},
+			// 					OrganizationUnit: ,
+			// 					Identity: 
+			// 				},
+			// 				admin: true
+			// 			}
+			// 		};
+
+			// 		console.log(JSON.stringify(j_request))
+
+			// 		// send genesis block to the peer
+			// 		return channel.joinChannel(j_request);
+			// 	}).then((results) => {
+			// 		if (results && results.response && results.response.status == 200) {
+			// 			console.log('Joined correctly')
+			// 		} else {
+			// 			console.log('Failed', results)
+			// 		}
+			// 	});
+			// }).then((results) => {
+			// 	// socket emit
+			// 	console.log('Send transaction promise and event listener promise have completed');
+			// 	result_of_tx['result'] = 'success'
+			// 	console.log(result_of_tx.toString('utf8', 0, result_of_tx.length));
+			// 	res.json(result_of_tx)
+			// })
+
+			///////////////////////////////////////////////
+			const data = req.query;
+			console.log(data.peer);
+			console.log(data.chaincode);
+
+			var peer = data.peer;
+			var chaincode = data.chaincode; 
+			var cmd = "docker start " + peer + " " + chaincode;
+
+			exec(cmd, function(err, stdout, stderr){
+				console.log("err");
+				console.log(err);
+				console.log("stdout");
+				console.log(stdout);
+				console.log("stderr");
+				console.log(stderr);
+				if( !err ){
+					var cmd_child = "docker ps -a";
+					exec(cmd_child, function(err, stdout, stderr){
+						res.send(stdout);
+					});
+				}
+			});
 		},
 	}
 })();
