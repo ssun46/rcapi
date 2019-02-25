@@ -43,16 +43,16 @@ var socket_conn = function (avail) {
     // socket////////////////////////////////////////////////////////
     // console.log("in the socket block #####################################")
     // console.log(avail);
-    var socket_client = io_client.connect('localhost:5050');
+    var socket_client = io_client.connect('222.239.231.245:5050');
     socket_client['io']['opts'] = {
-        'hostname': "localhost",
+        'hostname': "222.239.231.245",
         'path': "/socket.io",
         'port': "5050",
         'secure': false
     }
     socket_client['nsp'] = "/";
-    socket_client['io']['uri'] = "http://localhost:5050";
-    socket_client['io']['engine']['hostname'] = 'localhost';
+    socket_client['io']['uri'] = "http://222.239.231.245:5050";
+    socket_client['io']['engine']['hostname'] = '222.239.231.245';
     socket_client['io']['engine']['port'] = '5050';
     socket_client.on('connect', function () {
         // console.log("connect");
@@ -69,7 +69,7 @@ var cron = require('node-cron');
 cron.schedule('* * * * * *', () => {
     // 111111111111111111111111111111
     var peer_cfg1 = {
-        address: 'localhost',
+        address: '210.107.78.166',
         port: '7051'
     }
     tcpp.probe(peer_cfg1.address, peer_cfg1.port, function (err, avail) {
@@ -83,7 +83,7 @@ cron.schedule('* * * * * *', () => {
     });
     // 22222222222222222222222222222222
     var peer_cfg2 = {
-        address: 'localhost',
+        address: '210.107.78.166',
         port: '8051'
     }
     tcpp.probe(peer_cfg2.address, peer_cfg2.port, function (err, avail) {
@@ -96,33 +96,33 @@ cron.schedule('* * * * * *', () => {
     tcpp.ping(peer_cfg2, function (err, data) {
     });
     // 33333333333333333333333333333333
-    var peer_cfg3 = {
-        address: '210.107.78.167',
-        port: '9051'
-    }
-    tcpp.probe(peer_cfg3.address, peer_cfg3.port, function (err, avail) {
-            var message = {
-                "status" : avail,
-                "peer" : peer_cfg3.port
-            }
-            socket_conn(message);
-    });
-    tcpp.ping(peer_cfg3, function (err, data) {
-    });
+    // var peer_cfg3 = {
+    //     address: '210.107.78.167',
+    //     port: '9051'
+    // }
+    // tcpp.probe(peer_cfg3.address, peer_cfg3.port, function (err, avail) {
+    //         var message = {
+    //             "status" : avail,
+    //             "peer" : peer_cfg3.port
+    //         }
+    //         socket_conn(message);
+    // });
+    // tcpp.ping(peer_cfg3, function (err, data) {
+    // });
     // 444444444444444444444444444444444
-    var peer_cfg4 = {
-        address: '210.107.78.167',
-        port: '10051'
-    }
-    tcpp.probe(peer_cfg4.address, peer_cfg4.port, function (err, avail) {
-            var message = {
-                "status" : avail,
-                "peer" : peer_cfg4.port
-            }
-            socket_conn(message);
-    });
-    tcpp.ping(peer_cfg4, function (err, data) {
-    });
+    // var peer_cfg4 = {
+    //     address: '210.107.78.167',
+    //     port: '10051'
+    // }
+    // tcpp.probe(peer_cfg4.address, peer_cfg4.port, function (err, avail) {
+    //         var message = {
+    //             "status" : avail,
+    //             "peer" : peer_cfg4.port
+    //         }
+    //         socket_conn(message);
+    // });
+    // tcpp.ping(peer_cfg4, function (err, data) {
+    // });
 });
 
 // Load all of our middleware
