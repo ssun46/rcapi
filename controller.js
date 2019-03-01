@@ -407,15 +407,14 @@ module.exports = (function () {
 
 			var func_name = "transfer";
 			var param_list = []
-			param_list.push(param_userId);
 			param_list.push(param_fromId);
+			param_list.push(param_toId);
 			param_list.push(param_amount);
 			param_list.push(param_type);
 			param_list.push(param_date);
 			var result_of_tx = {};
-			var result_of_tx = {};
-			result_of_tx['userId'] = param_userId;
 			result_of_tx['fromId'] = param_fromId;
+			result_of_tx['toId'] = param_toId;
 			result_of_tx['amount'] = param_amount;
 			result_of_tx['date'] = param_date;
 
